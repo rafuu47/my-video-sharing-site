@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Simple Video Sharing</title>
+<style>
+  /* Reset and base */
+  * {
+    box-sizing: border-box;
+  }
+  body {
+    margin: 0; padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #121212;
+    color: #e0e0e0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  /* Header */
+  header {
+    position: sticky;
+    top: 0;
+    background: #1f1f1f;
+    height: 50px;
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 0 10px;
+    box-shadow: 0 1px 7px rgba(0,0,0,0.7);
+    z-index: 10;
+  }
+  #profile-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #353535;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    box-shadow: 0 0 8px #6200ee;
+  }
+  #profile-btn:hover {
+    background: #6200ee;
+  }
+  #profile-btn svg {
+    fill: #ddd;
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Main container for videos */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+    max-height: 600px;
+  }
+
+  /* Video grid */
+  .videos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 14px;
+  }
+  .video-card {
+    background: #222222cc;
+    border-radius: 12px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+    box-shadow: 0 2px 12px rgb(98, 0, 238, 0.4);
+    transition: transform 0.2s ease;
+  }
+  .video-card:hover {
+    transform: scale(1.05);
+  }
+  video {
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    width: 100%;
+    height: 110px;
+    background: black;
+    object-fit: cover;
+    user-select: none;
+  }
+  .video-info {
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 14px;
+    color: #bbb;
+  }
+  .views {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .views svg {
+    fill: #aaa;
+    width: 16px;
+    height: 16px;
+  }
+  .delete-btn {
+    background: transparent;
+    border: none;
+    color: #e03e3ecc;
+    font-weight: 700;
+    font-size: 18px;
+    cursor: pointer;
+    user-select: none;
+    outline-offset: 2px;
+    line-height: 1;
+    transition: color 0.3s ease;
+  }
+  .delete-btn:hover {
+    color: #ff3b3b;
+  }
+
+  /* Upload modal */
+  #upload-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(18, 18, 18, 0.95);
+    backdrop-filter: blur(5px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 20;
+  }
+  #upload-modal.active {
+    display: flex;
+  }
+  .modal-content {
+    background: #272727;
+    border-radius: 14px;
+    box-shadow: 0 0 20px #6200eeaa;
+    width: 90%;
+    max-width: 320px;
+    padding: 20px 22px;
+    display: flex;
+    flex-direction: column;
+  }
+  .modal-content h2 {
+    margin: 0 0 16px;
+    font-weight: 700;
+    color: #ddd;
+    font-size: 22px;
+    text-align: center;
+  }
+  label {
+    font-size: 14px;
+    margin-bottom: 8px;
+    color: #bbb;
+  }
+  input[type="file"] {
+    margin-bottom: 16px;
+    cursor: pointer;
+  }
+  button.upload-submit {
+    background: #6200ee;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 0;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.3s ease;
+  }
+  button.upload-submit:disabled {
+    background: #9a7fff88;
+    cursor: not-allowed;
+  }
+  button.upload-submit:hover:not(:disabled) {
+    background: #7e3ff2;
+  }
+  button.modal-close {
+    margin-top: 14px;
+    background: transparent;
+    border: none;
+    color: #888;
+    font-size: 14px;
+    cursor: pointer;
+    align-self: center;
+  }
+  button.modal-close:hover {
+    color: #fff;
+  }
+
+  /* Responsive for smaller screens */
+  @media (max-width: 400px) {
+    .video-card video {
+      height: 90px;
+    }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div id="profile-btn" title="Upload Video" tabindex="0" aria-label="Upload Video Button">
+    <!-- User profile icon -->
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
+    </svg>
+  </div>
+</header>
+<main>
+  <div class="videos-grid" id="videosGrid" aria-live="polite" aria-label="Video gallery">
+    <!-- Videos will appear here -->
+  </div>
+</main>
+
+<!-- Upload Modal -->
+<div id="upload-modal" role="dialog" aria-modal="true" aria-labelledby="uploadTitle">
+  <div class="modal-content">
+    <h2 id="uploadTitle">Upload a Video</h2>
+    <form id="uploadForm">
+      <label for="videoFile">Choose video file (max 50MB):</label>
+      <input type="file" id="videoFile" name="videoFile" accept="video/*" required />
+      <button type="submit" class="upload-submit" disabled>Upload</button>
+    </form>
+    <button class="modal-close" id="closeModalBtn">Cancel</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const profileBtn = document.getElementById('profile-btn');
+  const uploadModal = document.getElementById('upload-modal');
+  const closeModalBtn = document.getElementById('closeModalBtn');
+  const uploadForm = document.getElementById('uploadForm');
+  const videoFileInput = document.getElementById('videoFile');
+  const uploadSubmitBtn = uploadForm.querySelector('.upload-submit');
+  const videosGrid = document.getElementById('videosGrid');
+
+  // Storage key
+  const STORAGE_KEY = 'sharedVideosList';
+
+  // Load videos from localStorage or initialize empty array
+  let videos = [];
+
+  // Each video object structure:
+  // {
+  //   id: string,
+  //   name: string,
+  //   url: string (blob URL),
+  //   views: number,
+  //   uploadedAt: number (timestamp)
+  // }
+
+  // Save videos metadata to localStorage (without URL because URLs aren't persistent)
+  function saveMetadata() {
+    // We must recreate URLs from blobs - so actual video blobs will be saved in IndexedDB or we rely on Data URLs or localStorage base64 is very limited.
+    // For simplicity, we will store videos as base64 data URLs (beware of localStorage limits). But that can break for bigger videos.
+    // Instead, store meta + the file as base64 string. Let's implement that.
+
+    // Save videos array with videoData base64 encoded string
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(videos));
+    } catch(e) {
+      alert('Storage limit reached or error saving videos.');
+    }
+  }
+
+  // Load videos from localStorage and restore URLs
+  function loadVideos() {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (!stored) return [];
+
+    try {
+      const arr = JSON.parse(stored);
+      // restore URL from base64
+      return arr.map(v => {
+        if (v.videoData) {
+          const blob = base64ToBlob(v.videoData, v.type || 'video/mp4');
+          v.url = URL.createObjectURL(blob);
+        }
+        return v;
+      });
+    } catch(e) {
+      console.warn('Failed to parse videos from storage.');
+      return [];
+    }
+  }
+
+  // Convert base64 string to Blob
+  function base64ToBlob(base64, type) {
+    const byteString = atob(base64.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for(let i=0; i<byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], {type});
+  }
+
+  // Convert file to base64 string
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  // Render all videos in the grid
+  function renderVideos() {
+    videosGrid.innerHTML = '';
+    if(videos.length === 0) {
+      videosGrid.innerHTML = '<p style="color:#888;text-align:center;width:100%;margin-top:20px;">No videos uploaded yet.</p>';
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    videos.forEach(video => {
+      const card = document.createElement('div');
+      card.className = 'video-card';
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-label', `${video.name}, ${video.views} views, clickable to play`);
+
+      const vidEl = document.createElement('video');
+      vidEl.src = video.url;
+      vidEl.controls = false;
+      vidEl.preload = 'metadata';
+      vidEl.muted = true;
+      vidEl.playsInline = true;
+      vidEl.setAttribute('aria-hidden', 'true');
+      card.appendChild(vidEl);
+
+      const info = document.createElement('div');
+      info.className = 'video-info';
+
+      const views = document.createElement('div');
+      views.className = 'views';
+      views.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5c-7 0-11 6-11 7 0 1 .5 2 1.5 3 1.5 1.5 4 3 9.5 3s8-1.5 9.5-3c1-1 1.5-2 1.5-3 0-1-4-7-11-7zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8zM12 10a1 1 0 1 0 0 2 1 1 0 0 0 0-2z"/></svg>
+        ${video.views}
+      `;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.setAttribute('title', 'Delete Video');
+      deleteBtn.setAttribute('aria-label', `Delete video ${video.name}`);
+      deleteBtn.innerHTML = '&times;';
+
+      deleteBtn.addEventListener('click', e => {
+        e.stopPropagation();
+        deleteVideo(video.id);
+      });
+
+      info.appendChild(views);
+      info.appendChild(deleteBtn);
+      card.appendChild(info);
+
+      // Clicking card plays video in fullscreen and increments views
+      card.addEventListener('click', () => {
+        playVideo(video.id, vidEl);
+      });
+      card.addEventListener('keyup', (e) => {
+        if(e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          playVideo(video.id, vidEl);
+        }
+      });
+
+      fragment.appendChild(card);
+    });
+    videosGrid.appendChild(fragment);
+  }
+
+  // Play video fullscreen and increment view count
+  function playVideo(id, videoEl) {
+    // Find video
+    const video = videos.find(v => v.id === id);
+    if(!video) return;
+
+    // Increment views, update display and save
+    video.views++;
+    saveMetadata();
+    renderVideos();
+
+    // Create temporary fullscreen video player overlay
+    const fullscreenDiv = document.createElement('div');
+    fullscreenDiv.style.position = 'fixed';
+    fullscreenDiv.style.top = 0;
+    fullscreenDiv.style.left = 0;
+    fullscreenDiv.style.width = '100vw';
+    fullscreenDiv.style.height = '100vh';
+    fullscreenDiv.style.backgroundColor = 'rgba(0,0,0,0.95)';
+    fullscreenDiv.style.display = 'flex';
+    fullscreenDiv.style.justifyContent = 'center';
+    fullscreenDiv.style.alignItems = 'center';
+    fullscreenDiv.style.zIndex = 1000;
+
+    const fullVideo = document.createElement('video');
+    fullVideo.src = video.url;
+    fullVideo.controls = true;
+    fullVideo.autoplay = true;
+    fullVideo.style.maxWidth = '100%';
+    fullVideo.style.maxHeight = '100%';
+    fullVideo.playsInline = true;
+    fullscreenDiv.appendChild(fullVideo);
+
+    // Close on click outside video or Escape key
+    fullscreenDiv.addEventListener('click', (e) => {
+      if(e.target === fullscreenDiv) {
+        fullVideo.pause();
+        fullscreenDiv.remove();
+      }
+    });
+    document.addEventListener('keydown', function escListener(evt) {
+      if(evt.key === 'Escape') {
+        fullVideo.pause();
+        fullscreenDiv.remove();
+        document.removeEventListener('keydown', escListener);
+      }
+    });
+
+    document.body.appendChild(fullscreenDiv);
+  }
+
+  // Delete video by id
+  function deleteVideo(id) {
+    const idx = videos.findIndex(v => v.id === id);
+    if(idx === -1) return;
+    // Revoke blob URL
+    URL.revokeObjectURL(videos[idx].url);
+    videos.splice(idx,1);
+    saveMetadata();
+    renderVideos();
+  }
+
+  // Show upload modal
+  function showUploadModal() {
+    uploadModal.classList.add('active');
+    videoFileInput.value = '';
+    uploadSubmitBtn.disabled = true;
+    videoFileInput.focus();
+  }
+  // Hide upload modal
+  function hideUploadModal() {
+    uploadModal.classList.remove('active');
+  }
+
+  // When file chosen enable submit if valid
+  videoFileInput.addEventListener('change', () => {
+    if(videoFileInput.files.length === 1) {
+      const file = videoFileInput.files[0];
+      const maxSizeMb = 50;
+      if(file.size > maxSizeMb * 1024 * 1024) {
+        alert('File too large. Max size is 50MB.');
+        videoFileInput.value = '';
+        uploadSubmitBtn.disabled = true;
+        return;
+      }
+      uploadSubmitBtn.disabled = false;
+    } else {
+      uploadSubmitBtn.disabled = true;
+    }
+  });
+
+  // Handle upload form submit
+  uploadForm.addEventListener('submit', async e => {
+    e.preventDefault();
+    if(videoFileInput.files.length !== 1) return;
+
+    const file = videoFileInput.files[0];
+    // Convert to base64 for storage
+    try {
+      uploadSubmitBtn.disabled = true;
+      const base64 = await fileToBase64(file);
+      const id = 'vid_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+      const newVideo = {
+        id,
+        name: file.name,
+        videoData: base64,
+        type: file.type,
+        views: 0,
+        uploadedAt: Date.now()
+      };
+      videos.push(newVideo);
+      // Create blob URL for playback
+      const blob = base64ToBlob(base64, file.type);
+      newVideo.url = URL.createObjectURL(blob);
+      saveMetadata();
+      renderVideos();
+      hideUploadModal();
+    } catch(err) {
+      alert('Failed to upload video.');
+    }
+  });
+
+  // Close modal button
+  closeModalBtn.addEventListener('click', () => {
+    hideUploadModal();
+  });
+
+  // Keyboard accessibility for profile btn
+  profileBtn.addEventListener('click', showUploadModal);
+  profileBtn.addEventListener('keyup', e => {
+    if(e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      showUploadModal();
+    }
+  });
+
+  // Load videos on startup
+  videos = loadVideos();
+  renderVideos();
+
+  // Prevent scrolling outside modal when active
+  uploadModal.addEventListener('wheel', e => {
+    e.preventDefault();
+  }, {passive: false});
+})();
+</script>
+</body>
+</html>
